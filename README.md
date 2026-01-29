@@ -1,0 +1,107 @@
+# Sprite Extractor 🖼️
+
+Aplicação gráfica Qt6 para extrair sprites individuais de sprite sheets.
+
+## 📋 Descrição
+
+O Sprite Extractor é uma ferramenta que permite carregar imagens contendo múltiplas vistas de objetos (como robôs, veículos, personagens, etc.) e automaticamente detectar e exportar cada vista individual como um arquivo separado.
+
+## ✨ Funcionalidades
+
+- **Detecção Automática**: Detecta automaticamente sprites individuais usando processamento de imagem
+- **Suporte a Transparência**: Funciona com imagens PNG com canal alpha
+- **Ajuste de Parâmetros**: Controles para ajustar sensibilidade de detecção
+- **Preview Visual**: Visualização da imagem com bounding boxes destacando sprites detectados
+- **Exportação em Lote**: Exporta todos os sprites de uma vez com nomeação automática
+- **Interface Moderna**: Interface gráfica intuitiva e responsiva
+
+## 🚀 Instalação
+
+### Pré-requisitos
+
+- Python 3.8 ou superior
+- pip
+
+### Passos
+
+1. Clone ou baixe este repositório:
+```bash
+cd my-blueprint-maker
+```
+
+2. Instale as dependências:
+```bash
+pip install -r requirements.txt
+```
+
+## 💻 Uso
+
+### Executar a aplicação
+
+```bash
+python main.py
+```
+
+### Workflow típico
+
+1. **Carregar Imagem**: Clique em "📁 Carregar Imagem" e selecione seu sprite sheet
+2. **Ajustar Detecção** (opcional): Use os controles de threshold e área mínima para refinar a detecção
+3. **Verificar Sprites**: Os sprites detectados aparecem em verde na preview e na lista
+4. **Definir Prefixo**: Escolha um nome base para os arquivos (ex: "robot", "vehicle")
+5. **Exportar**: Clique em "💾 Exportar Sprites" e escolha a pasta de destino
+
+### Arquivos Exportados
+
+Os sprites são exportados com o formato:
+```
+{prefixo}_{número}.png
+```
+
+Exemplo:
+- `robot_01.png`
+- `robot_02.png`
+- `robot_03.png`
+
+## 🎯 Tipos de Sprite Sheets Suportados
+
+- **PNG com transparência**: Ideal para sprites com fundo transparente
+- **JPG/PNG com fundo sólido**: Funciona detectando diferenças de cor
+- **Qualquer arranjo**: Não precisa estar em grid regular
+
+## 🛠️ Tecnologias
+
+- **PyQt6**: Interface gráfica
+- **OpenCV**: Processamento e detecção de imagem
+- **NumPy**: Manipulação de arrays
+- **Pillow**: Suporte adicional de imagem
+
+## ⚙️ Parâmetros de Detecção
+
+- **Threshold** (1-255): Controla a sensibilidade da detecção. Valores menores detectam mais detalhes
+- **Área Mínima** (px²): Ignora regiões menores que este valor, útil para filtrar ruído
+
+## 📝 Dicas
+
+- Para sprites com fundo transparente, use threshold baixo (5-20)
+- Para sprites com fundo branco/claro, use threshold mais alto (200-250)
+- Ajuste a área mínima para ignorar artefatos pequenos
+- A detecção ordena sprites de cima para baixo, esquerda para direita
+
+## 🐛 Solução de Problemas
+
+**Sprites não detectados?**
+- Ajuste o threshold
+- Reduza a área mínima
+- Verifique se há contraste suficiente entre sprite e fundo
+
+**Muitos sprites falsos?**
+- Aumente a área mínima
+- Ajuste o threshold
+
+## 📄 Licença
+
+Este projeto é fornecido como está, para uso livre.
+
+## 👤 Autor
+
+Desenvolvido por Antigravity com ❤️
