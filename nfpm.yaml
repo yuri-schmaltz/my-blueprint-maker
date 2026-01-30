@@ -1,0 +1,21 @@
+name: "my-blueprint-maker"
+arch: "amd64"
+platform: "linux"
+version: "1.0.0"
+section: "utils"
+priority: "optional"
+maintainer: "Antigravity"
+description: "Sprite Extractor for Blueprints"
+vendor: "Antigravity"
+homepage: "https://github.com/yuri-schmaltz/my-blueprint-maker"
+license: "MIT"
+contents:
+  - src: "dist/my-blueprint-maker"
+    dst: "/usr/bin/my-blueprint-maker"
+overrides:
+  deb:
+    scripts:
+      postinstall: "chmod +x /usr/bin/my-blueprint-maker"
+  rpm:
+    scripts:
+      postinstall: "chmod +x /usr/bin/my-blueprint-maker"
