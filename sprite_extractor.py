@@ -131,9 +131,9 @@ class SpriteExtractor:
         # Extrair bounding boxes
         bboxes = []
         for contour in contours:
-            x, y, w, h = cv2.boundingRect(contour)
-            area = w * h
+            area = cv2.contourArea(contour)
             if area >= min_area:
+                x, y, w, h = cv2.boundingRect(contour)
                 bboxes.append((x, y, w, h))
         
         # Ordenar bounding boxes: primeiro por Y (linha), depois por X (coluna)
@@ -345,15 +345,22 @@ class SpriteExtractor:
                     curr_target_w = target_w
                     curr_target_h = target_h
                 
-                # Criar novo canvas (com alpha se o original tiver)
+                # Determinar cor de preenchimento baseada nas bordas do sprite
+                # Amostrar as bordas para pegar a cor predominante
+                top_edge = sprite_img[0, :]
+                bottom_edge = sprite_img[-1, :]
+                left_edge = sprite_img[:, 0]
+                right_edge = sprite_img[:, -1]
+                all_edges = np.concatenate([top_edge, bottom_edge, left_edge, right_edge])
+                
+                # Usar mediana para ser robusto a ruídos na borda
+                fill_color = np.median(all_edges, axis=0).astype(np.uint8)
+                
+                # Criar novo canvas preenchido com a cor detectada
                 if sprite_img.shape[2] == 4:
-                    new_img = np.zeros((curr_target_h, curr_target_w, 4), dtype=np.uint8)
+                    new_img = np.full((curr_target_h, curr_target_w, 4), fill_color, dtype=np.uint8)
                 else:
-                    # Se não tiver alpha, preencher com a cor do fundo (assumindo branco ou preto)
-                    # Usamos a lógica de detecção de fundo para decidir a cor do preenchimento
-                    # Aqui, como padrão para exportação "limpa", o branco (255) é comum em blueprints
-                    fill_val = 255 if self.original_image.mean() > 127 else 0
-                    new_img = np.full((curr_target_h, curr_target_w, 3), fill_val, dtype=np.uint8)
+                    new_img = np.full((curr_target_h, curr_target_w, 3), fill_color, dtype=np.uint8)
                 
                 # Calcular posição central
                 x_offset = (curr_target_w - w) // 2

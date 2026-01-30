@@ -53,12 +53,13 @@ class SpritePreview3D(QOpenGLWidget):
 
     def _draw_cube(self):
         # Mapeamento do cubo: faces (Front, Back, Left, Right, Top, Bottom)
+        # Ordem dos vértices: Bottom-Left, Bottom-Right, Top-Right, Top-Left (visto de fora)
         faces = [
             ('front',  [(-1, -1,  1), ( 1, -1,  1), ( 1,  1,  1), (-1,  1,  1)]),
-            ('back',   [(-1, -1, -1), (-1,  1, -1), ( 1,  1, -1), ( 1, -1, -1)]),
+            ('back',   [( 1, -1, -1), (-1, -1, -1), (-1,  1, -1), ( 1,  1, -1)]),
             ('left',   [(-1, -1, -1), (-1, -1,  1), (-1,  1,  1), (-1,  1, -1)]),
-            ('right',  [( 1, -1, -1), ( 1,  1, -1), ( 1,  1,  1), ( 1, -1,  1)]),
-            ('top',    [(-1,  1, -1), (-1,  1,  1), ( 1,  1,  1), ( 1,  1, -1)]),
+            ('right',  [( 1, -1,  1), ( 1, -1, -1), ( 1,  1, -1), ( 1,  1,  1)]),
+            ('top',    [(-1,  1,  1), ( 1,  1,  1), ( 1,  1, -1), (-1,  1, -1)]),
             ('bottom', [(-1, -1, -1), ( 1, -1, -1), ( 1, -1,  1), (-1, -1,  1)]),
         ]
 

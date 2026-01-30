@@ -8,14 +8,26 @@ from PyQt6.QtWidgets import (
     QSpinBox, QMessageBox, QGroupBox, QFormLayout, QTabWidget,
     QCheckBox, QComboBox
 )
-from PyQt6.QtCore import Qt, QRectF, QFileSystemWatcher
-from PyQt6.QtGui import QPixmap, QImage, QPen, QColor, QKeySequence, QShortcut
+from PyQt6.QtCore import Qt, QRectF, QFileSystemWatcher, pyqtSignal
+from PyQt6.QtGui import QPixmap, QImage, QPen, QColor, QKeySequence, QShortcut, QIcon
 from pathlib import Path
 import cv2
 import numpy as np
 
 from sprite_extractor import SpriteExtractor
 from preview_3d import SpritePreview3D
+
+
+class ClickableGraphicsView(QGraphicsView):
+    """QGraphicsView customizado que detecta cliques na imagem"""
+    clicked = pyqtSignal(int, int) # Sinal que emite x, y
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            # Obter coordenadas na cena
+            scene_pos = self.mapToScene(event.pos())
+            self.clicked.emit(int(scene_pos.x()), int(scene_pos.y()))
+        super().mousePressEvent(event)
 
 
 class MainWindow(QMainWindow):
@@ -36,6 +48,11 @@ class MainWindow(QMainWindow):
         """Inicializa a interface do usuário"""
         self.setWindowTitle("Sprite Extractor - Extrator de Sprites")
         self.setGeometry(100, 100, 1200, 800)
+        
+        # Definir ícone da janela
+        icon_path = Path(__file__).parent / "resources" / "icon.png"
+        if icon_path.exists():
+            self.setWindowIcon(QIcon(str(icon_path)))
         
         # Widget central
         central_widget = QWidget()
@@ -120,6 +137,10 @@ class MainWindow(QMainWindow):
         self.batch_prefix = QLineEdit("batch_sprite")
         form_layout.addRow("Prefixo:", self.batch_prefix)
         
+        self.batch_recursive = QCheckBox("Buscar em subpastas (recursivo)")
+        self.batch_recursive.setChecked(True)
+        form_layout.addRow("", self.batch_recursive)
+        
         layout.addWidget(form_group)
         
         # Log de progresso
@@ -159,16 +180,19 @@ class MainWindow(QMainWindow):
 
         input_path = Path(self.batch_input_path)
         output_path = Path(self.batch_output_path)
-        prefix = self.batch_prefix.text() or "sprite"
+        prefix_base = self.batch_prefix.text() or "sprite"
+        is_recursive = self.batch_recursive.isChecked()
         
         # Encontrar todas as imagens
         extensions = ['*.png', '*.jpg', '*.jpeg', '*.webp', '*.bmp']
         image_files = []
+        
+        glob_func = input_path.rglob if is_recursive else input_path.glob
         for ext in extensions:
-            image_files.extend(list(input_path.glob(ext)))
+            image_files.extend(list(glob_func(ext)))
         
         if not image_files:
-            QMessageBox.information(self, "Info", "Nenhuma imagem encontrada na pasta de entrada.")
+            QMessageBox.information(self, "Info", f"Nenhuma imagem encontrada na pasta de entrada {' (incluindo subpastas)' if is_recursive else ''}.")
             return
             
         self.batch_log.clear()
@@ -187,15 +211,27 @@ class MainWindow(QMainWindow):
                     sprites = temp_extractor.detect_sprites(threshold=threshold, min_area=min_area)
                     
                     if sprites:
-                        # Criar subpasta para este sprite sheet
+                        # Criar subpasta para este sprite sheet para manter organização
                         sheet_name = img_file.stem
                         sheet_output = output_path / sheet_name
-                        temp_extractor.export_sprites(str(sheet_output), f"{prefix}_{sheet_name}")
                         
-                        self.batch_log.addItem(f"✅ Sucesso: {img_file.name} ({len(sprites)} sprites)")
+                        # Usar configurações de exportação da aba principal
+                        padding = self.padding_spin.value()
+                        uniform = self.uniform_check.isChecked()
+                        
+                        # Prefixo combina a base com o nome do arquivo original para evitar colisões
+                        final_prefix = f"{prefix_base}_{sheet_name}"
+                        
+                        temp_extractor.export_sprites(
+                            output_dir=str(sheet_output),
+                            prefix=final_prefix,
+                            padding=padding,
+                            uniform_size=uniform
+                        )
                         processed_count += 1
+                        self.batch_log.addItem(f"✅ {img_file.name} -> {len(sprites)} sprites em /{sheet_name}")
                     else:
-                        self.batch_log.addItem(f"⚠️ Aviso: Nenhum sprite em {img_file.name}")
+                        self.batch_log.addItem(f"⚠️ {img_file.name}: Nenhum sprite detectado")
                 else:
                     self.batch_log.addItem(f"❌ Erro ao carregar: {img_file.name}")
             except Exception as e:
@@ -220,10 +256,11 @@ class MainWindow(QMainWindow):
         layout.addWidget(title)
         
         # Área de visualização da imagem
-        self.graphics_view = QGraphicsView()
+        self.graphics_view = ClickableGraphicsView()
         self.graphics_scene = QGraphicsScene()
         self.graphics_view.setScene(self.graphics_scene)
         self.graphics_view.setMinimumSize(600, 500)
+        self.graphics_view.clicked.connect(self.on_image_clicked)
         layout.addWidget(self.graphics_view)
         
         return panel
@@ -272,7 +309,7 @@ class MainWindow(QMainWindow):
         # Área mínima
         self.min_area_spinbox = QSpinBox()
         self.min_area_spinbox.setMinimum(10)
-        self.min_area_spinbox.setMaximum(10000)
+        self.min_area_spinbox.setMaximum(1000000)
         self.min_area_spinbox.setValue(100)
         self.min_area_spinbox.setSuffix(" px²")
         self.min_area_spinbox.valueChanged.connect(self.on_detection_params_changed)
@@ -327,27 +364,34 @@ class MainWindow(QMainWindow):
         # Grupo de edição de sprite
         self.edit_group = QGroupBox("Edição de Sprite Selecionado")
         self.edit_group.setEnabled(False)
-        edit_layout = QVBoxLayout()
+        edit_layout = QGridLayout() # Usar Grid para alinhar larguras dos botões
         self.edit_group.setLayout(edit_layout)
         
-        # Rotação
-        rotate_layout = QHBoxLayout()
-        rotate_layout.addWidget(QLabel("Rotação:"))
+        # Rotação (Linha 0)
+        edit_layout.addWidget(QLabel("Rotação:"), 0, 0)
+        rotate_container = QHBoxLayout()
         for angle in [0, 90, 180, 270]:
             btn = QPushButton(f"{angle}°")
             btn.clicked.connect(lambda checked, a=angle: self.rotate_selected_sprite(a))
-            rotate_layout.addWidget(btn)
-        edit_layout.addLayout(rotate_layout)
+            rotate_container.addWidget(btn)
+        edit_layout.addLayout(rotate_container, 0, 1)
         
-        # Lateralidade rápida
-        view_layout = QHBoxLayout()
-        view_layout.addWidget(QLabel("Vista:"))
-        quick_views = ["front", "back", "left", "right"]
-        for v in quick_views:
-            btn = QPushButton(v.title())
-            btn.clicked.connect(lambda checked, val=v: self.set_selected_sprite_view(val))
-            view_layout.addWidget(btn)
-        edit_layout.addLayout(view_layout)
+        # Lateralidade rápida (Linha 1)
+        edit_layout.addWidget(QLabel("Vista:"), 1, 0)
+        view_container = QHBoxLayout()
+        quick_views = [
+            ("front", "Front"), ("back", "Rear"), 
+            ("left", "Left"), ("right", "Right"), 
+            ("top", "Top"), ("bottom", "Down")
+        ]
+        for v_id, v_name in quick_views:
+            btn = QPushButton(v_name)
+            btn.clicked.connect(lambda checked, val=v_id: self.set_selected_sprite_view(val))
+            view_container.addWidget(btn)
+        edit_layout.addLayout(view_container, 1, 1)
+        
+        # Garantir que a coluna dos botões expanda
+        edit_layout.setColumnStretch(1, 1)
         
         layout.addWidget(self.edit_group)
         
@@ -518,7 +562,12 @@ class MainWindow(QMainWindow):
         selected_item = None
         for sprite in self.extractor.sprites:
             x, y, w, h = sprite.bbox
+            
+            # Formatar nome da vista para o usuário
             view_name = sprite.view_type.replace("_", " ").title()
+            if view_name == "Back": view_name = "Rear"
+            if view_name == "Bottom": view_name = "Down"
+            
             rot_label = f" ({sprite.rotation}°)" if sprite.rotation != 0 else ""
             item = QListWidgetItem(f"{view_name}{rot_label} - {w}x{h}px")
             item.setData(Qt.ItemDataRole.UserRole, sprite.index)
@@ -621,6 +670,30 @@ class MainWindow(QMainWindow):
         """Define o tipo de vista para o sprite selecionado"""
         if self.selected_sprite_index != -1:
             self.set_sprite_view(self.selected_sprite_index, view_type)
+    
+    def on_image_clicked(self, x, y):
+        """Callback quando a imagem é clicada"""
+        # Procurar qual sprite contém as coordenadas (x, y)
+        found_index = -1
+        for sprite in self.extractor.sprites:
+            sx, sy, sw, sh = sprite.bbox
+            if sx <= x <= sx + sw and sy <= y <= sy + sh:
+                found_index = sprite.index
+                break
+        
+        if found_index != -1:
+            # Selecionar na lista (isso disparará on_sprite_selected)
+            for i in range(self.sprites_list.count()):
+                item = self.sprites_list.item(i)
+                if item.data(Qt.ItemDataRole.UserRole) == found_index:
+                    self.sprites_list.setCurrentItem(item)
+                    break
+        else:
+            # Limpar seleção se clicar fora
+            self.sprites_list.clearSelection()
+            self.selected_sprite_index = -1
+            self.edit_group.setEnabled(False)
+            self.display_image(show_boxes=True)
     
     def export_sprites(self):
         """Exporta sprites para arquivos individuais"""
