@@ -8,8 +8,8 @@ from PyQt6.QtWidgets import (
     QSpinBox, QMessageBox, QGroupBox, QFormLayout, QTabWidget,
     QCheckBox, QComboBox
 )
-from PyQt6.QtCore import Qt, QRectF
-from PyQt6.QtGui import QPixmap, QImage, QPen, QColor
+from PyQt6.QtCore import Qt, QRectF, QFileSystemWatcher
+from PyQt6.QtGui import QPixmap, QImage, QPen, QColor, QKeySequence, QShortcut
 from pathlib import Path
 import cv2
 import numpy as np
@@ -21,10 +21,16 @@ from preview_3d import SpritePreview3D
 class MainWindow(QMainWindow):
     """Janela principal da aplicação"""
     
-    def __init__(self):
+    def __init__(self, initial_path=None):
         super().__init__()
         self.extractor = SpriteExtractor()
+        self.selected_sprite_index = -1
+        self.watcher = QFileSystemWatcher()
+        self.watcher.fileChanged.connect(self.on_file_updated)
         self.init_ui()
+        
+        if initial_path:
+            self.load_image(initial_path)
         
     def init_ui(self):
         """Inicializa a interface do usuário"""
@@ -62,8 +68,29 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(batch_tab, "Processamento em Lote")
         
         # Aba 3: Preview 3D (Novo!)
+        self.preview_3d_container = QWidget()
+        preview_3d_layout = QVBoxLayout()
+        self.preview_3d_container.setLayout(preview_3d_layout)
+        
         self.preview_3d_tab = SpritePreview3D()
-        self.tabs.addTab(self.preview_3d_tab, "Preview 3D")
+        preview_3d_layout.addWidget(self.preview_3d_tab)
+        
+        # Controles 3D
+        preview_controls = QHBoxLayout()
+        preview_controls.addWidget(QLabel("Cor de Fundo:"))
+        self.bg_combo = QComboBox()
+        self.bg_combo.addItems(["Cinza Escuro", "Preto", "Branco", "Céu"])
+        self.bg_combo.currentIndexChanged.connect(self.on_bg_color_changed)
+        preview_controls.addWidget(self.bg_combo)
+        preview_controls.addStretch()
+        preview_3d_layout.addLayout(preview_controls)
+        
+        self.tabs.addTab(self.preview_3d_container, "Preview 3D")
+        
+        # Atalhos de teclado
+        QShortcut(QKeySequence("Ctrl+D"), self).activated.connect(self.detect_sprites)
+        QShortcut(QKeySequence("Ctrl+E"), self).activated.connect(self.export_sprites)
+        QShortcut(QKeySequence("Ctrl+O"), self).activated.connect(self.load_image)
         
         # Conectar mudança de aba para atualizar 3D
         self.tabs.currentChanged.connect(self.on_tab_changed)
@@ -294,7 +321,35 @@ class MainWindow(QMainWindow):
         self.sprites_list.setMaximumHeight(200)
         self.sprites_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.sprites_list.customContextMenuRequested.connect(self.show_context_menu)
+        self.sprites_list.itemSelectionChanged.connect(self.on_sprite_selected)
         layout.addWidget(self.sprites_list)
+        
+        # Grupo de edição de sprite
+        self.edit_group = QGroupBox("Edição de Sprite Selecionado")
+        self.edit_group.setEnabled(False)
+        edit_layout = QVBoxLayout()
+        self.edit_group.setLayout(edit_layout)
+        
+        # Rotação
+        rotate_layout = QHBoxLayout()
+        rotate_layout.addWidget(QLabel("Rotação:"))
+        for angle in [0, 90, 180, 270]:
+            btn = QPushButton(f"{angle}°")
+            btn.clicked.connect(lambda checked, a=angle: self.rotate_selected_sprite(a))
+            rotate_layout.addWidget(btn)
+        edit_layout.addLayout(rotate_layout)
+        
+        # Lateralidade rápida
+        view_layout = QHBoxLayout()
+        view_layout.addWidget(QLabel("Vista:"))
+        quick_views = ["front", "back", "left", "right"]
+        for v in quick_views:
+            btn = QPushButton(v.title())
+            btn.clicked.connect(lambda checked, val=v: self.set_selected_sprite_view(val))
+            view_layout.addWidget(btn)
+        edit_layout.addLayout(view_layout)
+        
+        layout.addWidget(self.edit_group)
         
         # Grupo de exportação
         export_group = QGroupBox("Exportação")
@@ -347,23 +402,38 @@ class MainWindow(QMainWindow):
         
         return panel
     
-    def load_image(self):
+    def load_image(self, file_path=None):
         """Carrega uma imagem do disco"""
-        file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Selecionar Sprite Sheet",
-            str(Path.home()),
-            "Imagens (*.png *.jpg *.jpeg *.bmp *.webp)"
-        )
+        if not file_path:
+            file_path, _ = QFileDialog.getOpenFileName(
+                self,
+                "Selecionar Sprite Sheet",
+                str(Path.home()),
+                "Imagens (*.png *.jpg *.jpeg *.bmp *.webp)"
+            )
         
         if file_path:
             if self.extractor.load_image(file_path):
+                # Limpar watchers antigos e adicionar o novo
+                paths = self.watcher.files()
+                if paths:
+                    self.watcher.removePaths(paths)
+                self.watcher.addPath(str(file_path))
+                
                 self.display_image()
                 self.detect_btn.setEnabled(True)
                 # Auto-detectar sprites
                 self.detect_sprites()
             else:
                 QMessageBox.critical(self, "Erro", "Falha ao carregar a imagem")
+
+    def on_file_updated(self, path):
+        """Callback quando o arquivo vigiado é alterado externamente"""
+        if self.extractor.load_image(path):
+            self.detect_sprites()
+            # Se estiver na aba 3D, atualizar
+            if self.tabs.currentIndex() == 2:
+                self.sync_3d_preview()
     
     def display_image(self, show_boxes: bool = False):
         """Exibe a imagem no preview"""
@@ -372,7 +442,7 @@ class MainWindow(QMainWindow):
                 # Mostrar a máscara binária processada
                 image = self.extractor.get_binary_mask_preview()
             else:
-                image = self.extractor.get_preview_image(draw_boxes=show_boxes)
+                image = self.extractor.get_preview_image(draw_boxes=show_boxes, selected_index=self.selected_sprite_index)
             
             if image is None:
                 return
@@ -410,6 +480,10 @@ class MainWindow(QMainWindow):
     
     def detect_sprites(self):
         """Detecta sprites na imagem"""
+        self.selected_sprite_index = -1
+        if hasattr(self, 'edit_group'):
+            self.edit_group.setEnabled(False)
+            
         threshold = self.threshold_slider.value()
         min_area = self.min_area_spinbox.value()
         
@@ -441,12 +515,21 @@ class MainWindow(QMainWindow):
     def update_sprite_list(self):
         """Atualiza a lista de sprites na UI"""
         self.sprites_list.clear()
+        selected_item = None
         for sprite in self.extractor.sprites:
             x, y, w, h = sprite.bbox
             view_name = sprite.view_type.replace("_", " ").title()
-            item = QListWidgetItem(f"{view_name} - {w}x{h}px")
+            rot_label = f" ({sprite.rotation}°)" if sprite.rotation != 0 else ""
+            item = QListWidgetItem(f"{view_name}{rot_label} - {w}x{h}px")
             item.setData(Qt.ItemDataRole.UserRole, sprite.index)
             self.sprites_list.addItem(item)
+            if sprite.index == self.selected_sprite_index:
+                selected_item = item
+        
+        if selected_item:
+            self.sprites_list.blockSignals(True)
+            self.sprites_list.setCurrentItem(selected_item)
+            self.sprites_list.blockSignals(False)
 
     def show_context_menu(self, position):
         """Mostra menu de contexto para renomear vistas"""
@@ -475,6 +558,18 @@ class MainWindow(QMainWindow):
         
         menu.exec(self.sprites_list.mapToGlobal(position))
 
+    def on_bg_color_changed(self, index):
+        """Callback quando a cor de fundo do 3D muda"""
+        colors = [
+            (0.2, 0.2, 0.2), # Cinza Escuro
+            (0.0, 0.0, 0.0), # Preto
+            (0.9, 0.9, 0.9), # Branco
+            (0.5, 0.7, 1.0)  # Céu
+        ]
+        if 0 <= index < len(colors):
+            r, g, b = colors[index]
+            self.preview_3d_tab.set_bg_color(r, g, b)
+
     def on_tab_changed(self, index):
         """Callback quando as abas mudam"""
         if index == 2: # Aba 3D
@@ -499,6 +594,33 @@ class MainWindow(QMainWindow):
         text, ok = QInputDialog.getText(self, "Custom View", "Nome da vista:")
         if ok and text:
             self.set_sprite_view(index, text.lower().replace(" ", "_"))
+
+    def on_sprite_selected(self):
+        """Callback quando um sprite é selecionado na lista"""
+        selected_items = self.sprites_list.selectedItems()
+        if selected_items:
+            item = selected_items[0]
+            self.selected_sprite_index = item.data(Qt.ItemDataRole.UserRole)
+            self.edit_group.setEnabled(True)
+        else:
+            self.selected_sprite_index = -1
+            self.edit_group.setEnabled(False)
+        
+        self.display_image(show_boxes=True)
+
+    def rotate_selected_sprite(self, angle):
+        """Rotaciona o sprite selecionado"""
+        if self.selected_sprite_index != -1:
+            sprite = self.extractor.get_sprite(self.selected_sprite_index)
+            if sprite:
+                sprite.rotation = angle
+                self.update_sprite_list()
+                self.sync_3d_preview()
+
+    def set_selected_sprite_view(self, view_type):
+        """Define o tipo de vista para o sprite selecionado"""
+        if self.selected_sprite_index != -1:
+            self.set_sprite_view(self.selected_sprite_index, view_type)
     
     def export_sprites(self):
         """Exporta sprites para arquivos individuais"""

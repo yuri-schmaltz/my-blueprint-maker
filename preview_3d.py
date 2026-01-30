@@ -16,14 +16,22 @@ class SpritePreview3D(QOpenGLWidget):
         self.rotation_y = 0
         self.last_pos = None
         self.sprite_map = {} # view_type -> np.ndarray
+        self.bg_color = (0.2, 0.2, 0.2)
+
+    def set_bg_color(self, r, g, b):
+        """Define a cor de fundo do preview 3D"""
+        self.bg_color = (r, g, b)
+        self.makeCurrent()
+        gl.glClearColor(r, g, b, 1.0)
+        self.update()
 
     def set_sprites(self, sprites):
         """Atualiza os sprites para o cubo"""
-        self.sprite_map = {s.view_type: s.image for s in sprites}
+        self.sprite_map = {s.view_type: s for s in sprites}
         self.update()
 
     def initializeGL(self):
-        gl.glClearColor(0.2, 0.2, 0.2, 1.0)
+        gl.glClearColor(*self.bg_color, 1.0)
         gl.glEnable(gl.GL_DEPTH_TEST)
         gl.glEnable(gl.GL_TEXTURE_2D)
 
@@ -66,10 +74,23 @@ class SpritePreview3D(QOpenGLWidget):
     def _update_texture(self, view_type):
         """Carrega ou atualiza textura para uma face"""
         if view_type in self.sprite_map:
-            img = self.sprite_map[view_type]
+            sprite = self.sprite_map[view_type]
+            img = sprite.image.copy()
+            
+            # Aplicar rotação se houver
+            if sprite.rotation != 0:
+                if sprite.rotation == 90:
+                    img = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
+                elif sprite.rotation == 180:
+                    img = cv2.rotate(img, cv2.ROTATE_180)
+                elif sprite.rotation == 270:
+                    img = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
+            
             # Converter para RGBA se necessário
-            if len(img.shape) == 3:
+            if img.shape[2] == 3:
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA)
+            elif img.shape[2] == 4:
+                img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGBA)
             
             h, w = img.shape[:2]
             

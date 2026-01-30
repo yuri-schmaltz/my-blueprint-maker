@@ -16,8 +16,13 @@ def main():
     # Configurar estilo da aplicação
     app.setStyle("Fusion")
     
+    # Verificar se há um arquivo passado por argumento
+    initial_path = None
+    if len(sys.argv) > 1:
+        initial_path = sys.argv[1]
+    
     # Criar e exibir janela principal
-    window = MainWindow()
+    window = MainWindow(initial_path=initial_path)
     window.show()
     
     sys.exit(app.exec())

@@ -16,6 +16,7 @@ class Sprite:
     image: np.ndarray
     index: int
     view_type: str = "unknown"  # front, back, left, right, top, bottom, etc.
+    rotation: int = 0  # 0, 90, 180, 270 (sentido horário)
 
 
 class SpriteExtractor:
@@ -321,8 +322,17 @@ class SpriteExtractor:
             
             filepath = output_path / filename
             
-            # Processar imagem do sprite com padding e redimensionamento
-            sprite_img = sprite.image
+            # Processar imagem do sprite com rotação, padding e redimensionamento
+            sprite_img = sprite.image.copy()
+            
+            # Aplicar rotação se houver
+            if sprite.rotation != 0:
+                if sprite.rotation == 90:
+                    sprite_img = cv2.rotate(sprite_img, cv2.ROTATE_90_CLOCKWISE)
+                elif sprite.rotation == 180:
+                    sprite_img = cv2.rotate(sprite_img, cv2.ROTATE_180)
+                elif sprite.rotation == 270:
+                    sprite_img = cv2.rotate(sprite_img, cv2.ROTATE_90_COUNTERCLOCKWISE)
             
             if padding > 0 or uniform_size:
                 h, w = sprite_img.shape[:2]
@@ -360,12 +370,13 @@ class SpriteExtractor:
         return exported_files
     
     
-    def get_preview_image(self, draw_boxes: bool = True) -> Optional[np.ndarray]:
+    def get_preview_image(self, draw_boxes: bool = True, selected_index: int = -1) -> Optional[np.ndarray]:
         """
         Retorna uma imagem de preview com bounding boxes opcionais
         
         Args:
             draw_boxes: Se True, desenha retângulos ao redor dos sprites
+            selected_index: Índice do sprite selecionado para realce
             
         Returns:
             Imagem de preview ou None
@@ -384,11 +395,20 @@ class SpriteExtractor:
         if draw_boxes:
             for sprite in self.sprites:
                 x, y, w, h = sprite.bbox
-                # Desenhar retângulo verde ao redor do sprite
-                cv2.rectangle(preview, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                # Cor padrão verde
+                color = (0, 255, 0)
+                thickness = 2
+                
+                # Destacar se selecionado
+                if sprite.index == selected_index:
+                    color = (0, 0, 255) # Vermelho para seleção
+                    thickness = 4
+                
+                # Desenhar retângulo
+                cv2.rectangle(preview, (x, y), (x + w, y + h), color, thickness)
                 # Desenhar número do sprite
                 cv2.putText(preview, str(sprite.index + 1), (x, y - 5),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
         
         return preview
 
