@@ -2,7 +2,7 @@
 Main Window - Interface gráfica principal do Sprite Extractor
 """
 from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QPushButton, QLabel, QSlider, QLineEdit, QFileDialog,
     QGraphicsView, QGraphicsScene, QListWidget, QListWidgetItem,
     QSpinBox, QMessageBox, QGroupBox, QFormLayout, QTabWidget,
@@ -15,7 +15,7 @@ import cv2
 import numpy as np
 
 from sprite_extractor import SpriteExtractor
-from preview_3d import SpritePreview3D
+# from preview_3d import SpritePreview3D (Lazy loaded)
 
 
 class ClickableGraphicsView(QGraphicsView):
@@ -84,13 +84,12 @@ class MainWindow(QMainWindow):
         batch_tab = self._create_batch_panel()
         self.tabs.addTab(batch_tab, "Processamento em Lote")
         
-        # Aba 3: Preview 3D (Novo!)
+        # Aba 3: Preview 3D (Lazy Loaded)
         self.preview_3d_container = QWidget()
-        preview_3d_layout = QVBoxLayout()
-        self.preview_3d_container.setLayout(preview_3d_layout)
+        self.preview_3d_layout = QVBoxLayout()
+        self.preview_3d_container.setLayout(self.preview_3d_layout)
         
-        self.preview_3d_tab = SpritePreview3D()
-        preview_3d_layout.addWidget(self.preview_3d_tab)
+        self.preview_3d_tab = None
         
         # Controles 3D
         preview_controls = QHBoxLayout()
@@ -100,7 +99,7 @@ class MainWindow(QMainWindow):
         self.bg_combo.currentIndexChanged.connect(self.on_bg_color_changed)
         preview_controls.addWidget(self.bg_combo)
         preview_controls.addStretch()
-        preview_3d_layout.addLayout(preview_controls)
+        self.preview_3d_layout.addLayout(preview_controls)
         
         self.tabs.addTab(self.preview_3d_container, "Preview 3D")
         
@@ -609,6 +608,9 @@ class MainWindow(QMainWindow):
 
     def on_bg_color_changed(self, index):
         """Callback quando a cor de fundo do 3D muda"""
+        if self.preview_3d_tab is None:
+            return
+            
         colors = [
             (0.2, 0.2, 0.2), # Cinza Escuro
             (0.0, 0.0, 0.0), # Preto
@@ -622,11 +624,20 @@ class MainWindow(QMainWindow):
     def on_tab_changed(self, index):
         """Callback quando as abas mudam"""
         if index == 2: # Aba 3D
+            if self.preview_3d_tab is None:
+                # Lazy load 3D component and OpenGL
+                from preview_3d import SpritePreview3D
+                self.preview_3d_tab = SpritePreview3D()
+                self.preview_3d_layout.insertWidget(0, self.preview_3d_tab)
+                
+                # Sincronizar cor de fundo inicial
+                self.on_bg_color_changed(self.bg_combo.currentIndex())
+                
             self.sync_3d_preview()
 
     def sync_3d_preview(self):
         """Sincroniza os sprites atuais com o preview 3D"""
-        if self.extractor.sprites:
+        if self.preview_3d_tab and self.extractor.sprites:
             self.preview_3d_tab.set_sprites(self.extractor.sprites)
 
     def set_sprite_view(self, index, view_type):

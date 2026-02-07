@@ -43,13 +43,17 @@ class SpritePreview3D(QOpenGLWidget):
         gl.glMatrixMode(gl.GL_MODELVIEW)
 
     def paintGL(self):
-        gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
-        gl.glLoadIdentity()
-        gl.glTranslatef(0.0, 0.0, -5.0)
-        gl.glRotatef(self.rotation_x, 1, 0, 0)
-        gl.glRotatef(self.rotation_y, 0, 1, 0)
+        try:
+            gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
+            gl.glLoadIdentity()
+            gl.glTranslatef(0.0, 0.0, -5.0)
+            gl.glRotatef(self.rotation_x, 1, 0, 0)
+            gl.glRotatef(self.rotation_y, 0, 1, 0)
 
-        self._draw_cube()
+            self._draw_cube()
+        except Exception as e:
+            # Log error but don't crash - OpenGL errors can be transient
+            print(f"[3D Preview] OpenGL error: {e}")
 
     def _draw_cube(self):
         # Mapeamento do cubo: faces (Front, Back, Left, Right, Top, Bottom)

@@ -1,0 +1,13 @@
+README.md
+extrator_sprites_gimp.py
+main.py
+main_window.py
+preview_3d.py
+pyproject.toml
+sprite_extractor.py
+my_blueprint_maker.egg-info/PKG-INFO
+my_blueprint_maker.egg-info/SOURCES.txt
+my_blueprint_maker.egg-info/dependency_links.txt
+my_blueprint_maker.egg-info/entry_points.txt
+my_blueprint_maker.egg-info/requires.txt
+my_blueprint_maker.egg-info/top_level.txt

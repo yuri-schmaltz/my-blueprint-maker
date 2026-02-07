@@ -1,0 +1,5 @@
+extrator_sprites_gimp
+main
+main_window
+preview_3d
+sprite_extractor
