@@ -150,10 +150,10 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            linux-assets/my-blueprint-maker
-            linux-assets/*.deb
-            linux-assets/*.rpm
-            linux-assets/*.AppImage
+            linux-assets/dist/my-blueprint-maker
+            linux-assets/packages/*.deb
+            linux-assets/packages/*.rpm
+            linux-assets/packages/*.AppImage
             windows-assets/my-blueprint-maker.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
