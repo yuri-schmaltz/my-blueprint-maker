@@ -6,9 +6,6 @@ Data: 2026-01-29
 """
 import sys
 import argparse
-from PyQt6.QtWidgets import QApplication
-from main_window import MainWindow
-
 
 def main():
     """Função principal"""
@@ -17,6 +14,10 @@ def main():
     parser.add_argument("--version", action="version", version="Sprite Extractor 1.0.0")
     args = parser.parse_args()
 
+    # Importar apenas se não for --version ou --help (que o argparse já resolveu)
+    from PyQt6.QtWidgets import QApplication
+    from main_window import MainWindow
+    
     app = QApplication(sys.argv)
     
     # Configurar estilo da aplicação
