@@ -12,6 +12,10 @@ license: "MIT"
 contents:
   - src: "dist/my-blueprint-maker"
     dst: "/usr/bin/my-blueprint-maker"
+  - src: "resources/my-blueprint-maker.desktop"
+    dst: "/usr/share/applications/my-blueprint-maker.desktop"
+  - src: "resources/icon.png"
+    dst: "/usr/share/icons/hicolor/256x256/apps/my-blueprint-maker.png"
 overrides:
   deb:
     scripts:

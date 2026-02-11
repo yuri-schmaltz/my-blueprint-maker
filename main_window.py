@@ -41,6 +41,9 @@ class MainWindow(QMainWindow):
         self.watcher.fileChanged.connect(self.on_file_updated)
         self.init_ui()
         
+        # Habilitar Drag and Drop
+        self.setAcceptDrops(True)
+        
         if initial_path:
             self.load_image(initial_path)
         
@@ -444,6 +447,27 @@ class MainWindow(QMainWindow):
         layout.addStretch()
         
         return panel
+    
+    def dragEnterEvent(self, event):
+        """Detecta quando um arquivo é arrastado para a janela"""
+        if event.mimeData().hasUrls():
+            # Verificar se pelo menos um dos arquivos é uma imagem
+            for url in event.mimeData().urls():
+                file_path = url.toLocalFile()
+                if Path(file_path).suffix.lower() in ['.png', '.jpg', '.jpeg', '.webp', '.bmp']:
+                    event.accept()
+                    return
+        event.ignore()
+
+    def dropEvent(self, event):
+        """Lida com a soltura do arquivo na janela"""
+        if event.mimeData().hasUrls():
+            # Pegar o primeiro arquivo de imagem válido
+            for url in event.mimeData().urls():
+                file_path = url.toLocalFile()
+                if Path(file_path).suffix.lower() in ['.png', '.jpg', '.jpeg', '.webp', '.bmp']:
+                    self.load_image(file_path)
+                    break
     
     def load_image(self, file_path=None):
         """Carrega uma imagem do disco"""

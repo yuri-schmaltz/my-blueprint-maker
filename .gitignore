@@ -1,0 +1,5 @@
+__pycache__/sprite_extractor.cpython-312.pyc
+resources/my-blueprint-maker.desktop
+tests/__pycache__/conftest.cpython-312-pytest-7.4.4.pyc
+tests/__pycache__/test_cli.cpython-312-pytest-7.4.4.pyc
+tests/__pycache__/test_extractor.cpython-312-pytest-7.4.4.pyc
